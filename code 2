@@ -1,0 +1,116 @@
+2.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+#define SERVER_PORT 9876
+#define BUFFER_SIZE 1024
+
+// Function to resolve DNS query (dummy implementation)
+char* resolveDNS(char* domain) {
+    // Dummy logic - replace with your actual DNS resolution logic
+    if (strcmp(domain, "www.example.com") == 0) {
+        return "192.168.1.1";
+    } else {
+        return "DNS Entry Not Found";
+    }
+}
+
+int main() {
+    int sockfd;
+    struct sockaddr_in serverAddr, clientAddr;
+    socklen_t addrLen = sizeof(clientAddr);
+    char buffer[BUFFER_SIZE];
+
+    // Create socket
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    // Bind socket
+    if (bind(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error binding socket");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("DNS Server listening on port %d...\n", SERVER_PORT);
+
+    while (1) {
+        // Receive DNS query from client
+        if (recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&clientAddr, &addrLen) == -1) {
+            perror("Error receiving data");
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Received DNS query: %s\n", buffer);
+
+        // Resolve DNS query
+        char* ipAddress = resolveDNS(buffer);
+
+        // Send the resolved IP address back to the client
+        if (sendto(sockfd, ipAddress, strlen(ipAddress), 0, (struct sockaddr*)&clientAddr, addrLen) == -1) {
+            perror("Error sending data");
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Sent DNS response: %s\n", ipAddress);
+    }
+
+    close(sockfd);
+
+    return 0;
+}
+
+2.c#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+#define SERVER_PORT 9876
+#define BUFFER_SIZE 1024
+
+int main() {
+    int sockfd;
+    struct sockaddr_in serverAddr;
+    char buffer[BUFFER_SIZE];
+
+    // Create socket
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+    serverAddr.sin_addr.s_addr = INADDR_ANY; // Use any available local address
+
+    // DNS query
+    char* domain = "www.example.com";
+    if (sendto(sockfd, domain, strlen(domain), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error sending data");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Sent DNS query: %s\n", domain);
+
+    // Receive DNS response from server
+    if (recvfrom(sockfd, buffer, BUFFER_SIZE, 0, NULL, NULL) == -1) {
+        perror("Error receiving data");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Resolved IP address: %s\n", buffer);
+
+    close(sockfd);
+
+    return 0;
+}
