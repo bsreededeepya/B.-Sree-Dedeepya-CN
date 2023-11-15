@@ -1,0 +1,133 @@
+4.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+#define PORT 9876
+#define BUFFER_SIZE 1024
+
+int main() {
+    int serverSocket, clientSocket;
+    struct sockaddr_in serverAddr, clientAddr;
+    socklen_t clientAddrLen = sizeof(clientAddr);
+    char buffer[BUFFER_SIZE];
+
+    // Create socket
+    if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(PORT);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    // Bind socket
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error binding socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(serverSocket, 10) == -1) {
+        perror("Error listening for connections");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("TCP Echo Server listening on port %d...\n", PORT);
+
+    // Accept incoming connections and echo data back
+    while (1) {
+        // Accept a connection
+        if ((clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrLen)) == -1) {
+            perror("Error accepting connection");
+            continue;
+        }
+
+        printf("Accepted connection from %s\n", inet_ntoa(clientAddr.sin_addr));
+
+        // Receive and echo data back to the client
+        ssize_t bytesRead;
+        while ((bytesRead = recv(clientSocket, buffer, BUFFER_SIZE, 0)) > 0) {
+            send(clientSocket, buffer, bytesRead, 0);
+        }
+
+        printf("Connection from %s closed\n", inet_ntoa(clientAddr.sin_addr));
+
+        // Close the client socket
+        close(clientSocket);
+    }
+
+    // Close the server socket (this part of the code is not reachable in this example)
+    close(serverSocket);
+
+    return 0;
+}
+
+
+4.c.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+#define SERVER_IP "127.0.0.1"
+#define PORT 9876
+#define BUFFER_SIZE 1024
+
+int main() {
+    int clientSocket;
+    struct sockaddr_in serverAddr;
+    char buffer[BUFFER_SIZE];
+
+    // Create socket
+    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(PORT);
+    inet_pton(AF_INET, SERVER_IP, &(serverAddr.sin_addr));
+
+    // Connect to the server
+    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error connecting to server");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Connected to TCP Echo Server at %s:%d\n", SERVER_IP, PORT);
+
+    // Send data to the server and receive the echoed data
+    while (1) {
+        printf("Enter message to send (or 'exit' to quit): ");
+        fgets(buffer, BUFFER_SIZE, stdin);
+
+        // Exit the loop if the user enters "exit"
+        if (strncmp(buffer, "exit", 4) == 0) {
+            break;
+        }
+
+        // Send data to the server
+        send(clientSocket, buffer, strlen(buffer), 0);
+
+        // Receive echoed data from the server
+        ssize_t bytesRead = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+        if (bytesRead <= 0) {
+            perror("Error receiving data");
+            break;
+        }
+
+        // Null-terminate the received data and print it
+        buffer[bytesRead] = '\0';
+        printf("Server echoed: %s", buffer);
+    }
+
+    // Close the client socket
+    close(clientSocket);
+
+    return 0;
+}
