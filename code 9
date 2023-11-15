@@ -1,0 +1,75 @@
+9.#include <stdio.h>
+#include <string.h>
+
+#define N 8  // Size of the data word
+#define M 4  // Size of the CRC remainder
+
+// Function to perform CRC error detection
+void performCRC(char data[N], char generator[M], char receivedData[N + M - 1]) {
+    char remainder[M - 1];
+    char divisor[N + M - 1];
+
+    // Copy the data to the divisor
+    strcpy(divisor, data);
+
+    // Append zeros to the divisor (equal to the size of the CRC remainder)
+    strcat(divisor, "000");
+
+    // Perform division
+    for (int i = 0; i < N; ++i) {
+        if (divisor[i] == '1') {
+            // XOR operation
+            for (int j = 0; j < M; ++j) {
+                divisor[i + j] = (divisor[i + j] == generator[j]) ? '0' : '1';
+            }
+        }
+    }
+
+    // Copy the remainder
+    strcpy(remainder, divisor + N);
+
+    // Append the remainder to the received data
+    strcat(receivedData, remainder);
+}
+
+int main() {
+    char data[N + 1], generator[M], receivedData[N + M - 1];
+
+    // Input data and generator
+    printf("Enter data (binary): ");
+    scanf("%s", data);
+
+    printf("Enter generator (binary): ");
+    scanf("%s", generator);
+
+    // Initialize receivedData with the original data
+    strcpy(receivedData, data);
+
+    // Perform CRC
+    performCRC(data, generator, receivedData);
+
+    // Simulate transmission by flipping a bit in the received data
+    int errorPosition;
+    printf("Simulate an error by flipping a bit at position (0-%d): ", N + M - 2);
+    scanf("%d", &errorPosition);
+
+    if (errorPosition >= 0 && errorPosition < N + M - 1) {
+        receivedData[errorPosition] = (receivedData[errorPosition] == '0') ? '1' : '0';
+        printf("Error introduced at position %d\n", errorPosition);
+    } else {
+        printf("Invalid position for error simulation.\n");
+        return 1;
+    }
+
+    // Check for errors using CRC
+    performCRC(receivedData, generator, receivedData);
+
+    // Check if the remainder is zero
+    if (strcmp(receivedData + N, "000") == 0) {
+        printf("No errors detected. Data is correct.\n");
+    } else {
+        printf("Errors detected in the received data.\n");
+    }
+
+    return 0;
+}
