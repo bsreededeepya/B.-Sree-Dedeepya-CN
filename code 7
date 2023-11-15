@@ -1,0 +1,57 @@
+7.#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+
+#define MAX_NODES 5
+
+// Function to perform distance vector routing
+void distanceVectorRouting(int costMatrix[MAX_NODES][MAX_NODES], int nodes) {
+    int distance[MAX_NODES][MAX_NODES];
+    int nextHop[MAX_NODES][MAX_NODES];
+
+    // Initialize distance and nextHop matrices
+    for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+            distance[i][j] = costMatrix[i][j];
+            nextHop[i][j] = (i == j) ? -1 : j;
+        }
+    }
+
+    // Update distance and nextHop matrices
+    for (int k = 0; k < nodes; ++k) {
+        for (int i = 0; i < nodes; ++i) {
+            for (int j = 0; j < nodes; ++j) {
+                if (distance[i][k] + distance[k][j] < distance[i][j]) {
+                    distance[i][j] = distance[i][k] + distance[k][j];
+                    nextHop[i][j] = nextHop[i][k];
+                }
+            }
+        }
+    }
+
+    // Display the routing table
+    printf("\nRouting Table:\n");
+    for (int i = 0; i < nodes; ++i) {
+        printf("\nNode %d:\n", i);
+        printf("Destination\tNext Hop\tCost\n");
+        for (int j = 0; j < nodes; ++j) {
+            printf("%d\t\t%d\t\t%d\n", j, nextHop[i][j], distance[i][j]);
+        }
+    }
+}
+
+int main() {
+    int costMatrix[MAX_NODES][MAX_NODES] = {
+        {0, 1, 3, INT_MAX, INT_MAX},
+        {1, 0, INT_MAX, 2, INT_MAX},
+        {3, INT_MAX, 0, INT_MAX, 5},
+        {INT_MAX, 2, INT_MAX, 0, 4},
+        {INT_MAX, INT_MAX, 5, 4, 0}
+    };
+
+    int nodes = MAX_NODES;
+
+    distanceVectorRouting(costMatrix, nodes);
+
+    return 0;
+}
