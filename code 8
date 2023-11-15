@@ -1,0 +1,146 @@
+8.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+#define PORT 9876
+#define BUFFER_SIZE 1024
+
+void handleClient(int clientSocket) {
+    FILE *file;
+    char buffer[BUFFER_SIZE];
+    ssize_t bytesRead;
+
+    // Open the file for writing
+    file = fopen("received_file.txt", "wb");
+    if (file == NULL) {
+        perror("Error opening file for writing");
+        exit(EXIT_FAILURE);
+    }
+
+    // Receive and write file content
+    while ((bytesRead = recv(clientSocket, buffer, BUFFER_SIZE, 0)) > 0) {
+        fwrite(buffer, 1, bytesRead, file);
+    }
+
+    // Close the file
+    fclose(file);
+
+    printf("File received successfully.\n");
+
+    // Close the client socket
+    close(clientSocket);
+}
+
+int main() {
+    int serverSocket, clientSocket;
+    struct sockaddr_in serverAddr, clientAddr;
+    socklen_t clientAddrLen = sizeof(clientAddr);
+
+    // Create socket
+    if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(PORT);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    // Bind socket
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error binding socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(serverSocket, 1) == -1) {
+        perror("Error listening for connections");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("TCP File Transfer Server listening on port %d...\n", PORT);
+
+    // Accept a connection
+    if ((clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrLen)) == -1) {
+        perror("Error accepting connection");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Accepted connection from %s\n", inet_ntoa(clientAddr.sin_addr));
+
+    // Handle the file transfer for the connected client
+    handleClient(clientSocket);
+
+    // Close the server socket
+    close(serverSocket);
+
+    return 0;
+}
+
+8.c.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+#define SERVER_IP "127.0.0.1"
+#define PORT 9876
+#define BUFFER_SIZE 1024
+
+void sendFile(const char *filePath, int serverSocket) {
+    FILE *file;
+    char buffer[BUFFER_SIZE];
+    ssize_t bytesRead;
+
+    // Open the file for reading
+    file = fopen(filePath, "rb");
+    if (file == NULL) {
+        perror("Error opening file for reading");
+        exit(EXIT_FAILURE);
+    }
+
+    // Read and send file content
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        send(serverSocket, buffer, bytesRead, 0);
+    }
+
+    // Close the file
+    fclose(file);
+
+    printf("File sent successfully.\n");
+}
+
+int main() {
+    int clientSocket;
+    struct sockaddr_in serverAddr;
+
+    // Create socket
+    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(PORT);
+    inet_pton(AF_INET, SERVER_IP, &(serverAddr.sin_addr));
+
+    // Connect to the server
+    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        perror("Error connecting to server");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Connected to TCP File Transfer Server at %s:%d\n", SERVER_IP, PORT);
+
+    // Send a file to the server
+    sendFile("sample.txt", clientSocket); // Replace "sample.txt" with the path to your file
+
+    // Close the client socket
+    close(clientSocket);
+
+    return 0;
+}
