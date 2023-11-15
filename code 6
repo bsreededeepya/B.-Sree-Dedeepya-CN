@@ -1,0 +1,166 @@
+6.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <netinet/if_ether.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+
+void sendArpRequest(const char* targetIp, const char* interface) {
+    // Create a raw socket
+    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
+    if (sock == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Get interface index
+    struct ifreq if_idx;
+    strncpy(if_idx.ifr_name, interface, IFNAMSIZ - 1);
+    if (ioctl(sock, SIOCGIFINDEX, &if_idx) < 0) {
+        perror("Error getting interface index");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    // Get interface MAC address
+    struct ifreq if_mac;
+    strncpy(if_mac.ifr_name, interface, IFNAMSIZ - 1);
+    if (ioctl(sock, SIOCGIFHWADDR, &if_mac) < 0) {
+        perror("Error getting interface MAC address");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    // Create ARP request
+    struct ether_arp arpRequest;
+    memset(&arpRequest, 0, sizeof(struct ether_arp));
+    arpRequest.arp_hrd = htons(ARPHRD_ETHER); // Ethernet hardware format
+    arpRequest.arp_pro = htons(ETH_P_IP);     // Protocol type
+    arpRequest.arp_hln = 6;                   // Hardware address length (MAC address)
+    arpRequest.arp_pln = 4;                   // Protocol address length (IPv4 address)
+    arpRequest.arp_op = htons(ARPOP_REQUEST); // ARP operation (request)
+
+    // Set sender's MAC address
+    memcpy(arpRequest.arp_sha, if_mac.ifr_hwaddr.sa_data, 6);
+
+    // Set sender's IP address
+    inet_pton(AF_INET, "0.0.0.0", &arpRequest.arp_spa);
+
+    // Set target's MAC address to broadcast address
+    memset(arpRequest.arp_tha, 0xFF, 6);
+
+    // Set target's IP address
+    inet_pton(AF_INET, targetIp, &arpRequest.arp_tpa);
+
+    // Create Ethernet frame
+    struct ether_header etherHeader;
+    memset(&etherHeader, 0, sizeof(struct ether_header));
+    memcpy(etherHeader.ether_shost, if_mac.ifr_hwaddr.sa_data, 6);
+    memset(etherHeader.ether_dhost, 0xFF, 6); // Broadcast MAC address
+    etherHeader.ether_type = htons(ETH_P_ARP);
+
+    // Create packet buffer
+    char packetBuffer[sizeof(struct ether_header) + sizeof(struct ether_arp)];
+    memcpy(packetBuffer, &etherHeader, sizeof(struct ether_header));
+    memcpy(packetBuffer + sizeof(struct ether_header), &arpRequest, sizeof(struct ether_arp));
+
+    // Set destination address and send the ARP request
+    struct sockaddr_ll socketAddress;
+    memset(&socketAddress, 0, sizeof(struct sockaddr_ll));
+    socketAddress.sll_ifindex = if_idx.ifr_ifindex;
+    socketAddress.sll_protocol = htons(ETH_P_ARP);
+
+    if (sendto(sock, packetBuffer, sizeof(packetBuffer), 0, (struct sockaddr*)&socketAddress, sizeof(struct sockaddr_ll)) == -1) {
+        perror("Error sending ARP request");
+    }
+
+    // Close the socket
+    close(sock);
+}
+
+int main() {
+    const char* targetIp = "192.168.1.1"; // Replace with the target IP address
+    const char* interface = "eth0";        // Replace with the desired network interface
+
+    sendArpRequest(targetIp, interface);
+
+    return 0;
+}
+
+6.c.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <netinet/if_ether.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+
+void receiveArpResponses(const char* interface) {
+    // Create a raw socket
+    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
+    if (sock == -1) {
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Get interface index
+    struct ifreq if_idx;
+    strncpy(if_idx.ifr_name, interface, IFNAMSIZ - 1);
+    if (ioctl(sock, SIOCGIFINDEX, &if_idx) < 0) {
+        perror("Error getting interface index");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    // Set socket options to bind to the specified interface
+    struct sockaddr_ll socketAddress;
+    memset(&socketAddress, 0, sizeof(struct sockaddr_ll));
+    socketAddress.sll_family = AF_PACKET;
+    socketAddress.sll_ifindex = if_idx.ifr_ifindex;
+    socketAddress.sll_protocol = htons(ETH_P_ARP);
+
+    if (bind(sock, (struct sockaddr*)&socketAddress, sizeof(struct sockaddr_ll)) == -1) {
+        perror("Error binding socket to interface");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Waiting for ARP responses...\n");
+
+    // Receive ARP responses
+    while (1) {
+        char buffer[ETH_FRAME_LEN];
+        ssize_t bytesRead = recv(sock, buffer, ETH_FRAME_LEN, 0);
+        if (bytesRead == -1) {
+            perror("Error receiving data");
+            break;
+        }
+
+        // Extract ARP header from the Ethernet frame
+        struct ether_arp* arpResponse = (struct ether_arp*)(buffer + sizeof(struct ether_header));
+
+        // Check if it is an ARP reply
+        if (ntohs(arpResponse->arp_op) == ARPOP_REPLY) {
+            // Display the ARP response details
+            char senderIp[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, arpResponse->arp_spa, senderIp, INET_ADDRSTRLEN);
+
+            char senderMac[18];
+            sprintf(senderMac, "%02x:%02x:%02x:%02x:%02x:%02x",
+                    arpResponse->arp_sha[0], arpResponse->arp_sha[1], arpResponse->arp_sha[2],
+                    arpResponse->arp_sha[3], arpResponse->arp_sha[4], arpResponse->arp_sha[5]);
+
+            printf("ARP Response received:\n");
+            printf("Sender IP: %s\n", senderIp);
+            printf("Sender MAC: %s\n", senderMac);
+        }
+    }
+
+    //
