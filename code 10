@@ -1,0 +1,84 @@
+10.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define WINDOW_SIZE 4
+#define FRAME_COUNT 10
+
+// Structure to represent a frame
+struct Frame {
+    int seqNumber;
+    char data[20];
+};
+
+// Function to send frames using Go-Back-N protocol
+void sendFrames(struct Frame frames[], int totalFrames, int windowSize) {
+    int base = 0;
+    int nextSeqNumber = 0;
+
+    while (base < totalFrames) {
+        // Send frames within the window
+        for (int i = base; i < base + windowSize && i < totalFrames; ++i) {
+            printf("Sending Frame %d: %s\n", frames[i].seqNumber, frames[i].data);
+            nextSeqNumber++;
+        }
+
+        // Simulate acknowledgment
+        printf("Simulating acknowledgment for frames %d to %d\n", base, base + windowSize - 1);
+        base += windowSize;
+    }
+}
+
+int main() {
+    struct Frame frames[FRAME_COUNT];
+
+    // Initialize frames with some data
+    for (int i = 0; i < FRAME_COUNT; ++i) {
+        frames[i].seqNumber = i;
+        sprintf(frames[i].data, "Data_%d", i);
+    }
+
+    printf("Sending frames using Go-Back-N protocol:\n");
+    sendFrames(frames, FRAME_COUNT, WINDOW_SIZE);
+
+    return 0;
+}
+
+10.c.#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define WINDOW_SIZE 4
+#define FRAME_COUNT 10
+
+// Structure to represent an acknowledgment
+struct Acknowledgment {
+    int ackNumber;
+};
+
+// Function to receive frames using Go-Back-N protocol
+void receiveFrames(struct Acknowledgment ack, struct Acknowledgment expectedAck) {
+    if (ack.ackNumber == expectedAck.ackNumber) {
+        printf("Received acknowledgment for Frame %d\n", ack.ackNumber);
+        expectedAck.ackNumber++;
+    } else {
+        printf("Received out-of-sequence acknowledgment: %d (expected %d)\n", ack.ackNumber, expectedAck.ackNumber);
+    }
+}
+
+int main() {
+    struct Acknowledgment expectedAck;
+    expectedAck.ackNumber = 0;
+
+    // Simulate receiving acknowledgments
+    for (int i = 0; i < FRAME_COUNT; ++i) {
+        struct Acknowledgment ack;
+        ack.ackNumber = i;
+
+        receiveFrames(ack, expectedAck);
+    }
+
+    return 0;
+}
